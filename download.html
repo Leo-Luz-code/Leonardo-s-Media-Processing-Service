@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Baixe sua Música - Baixa Músicas do YouTube</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>🎉 Música Pronta!</h1>
+
+      <div class="music-info">
+        <p>Sua música foi convertida com sucesso</p>
+        <div class="size-badge" id="file-size">Carregando...</div>
+      </div>
+
+      <div id="message" class="message"></div>
+
+      <div class="button-group">
+        <button
+          class="download-btn"
+          id="download-btn"
+          onclick="executarDownload()"
+        >
+          📥 Salvar Música
+        </button>
+        <button class="back-btn" onclick="voltarParaInicio()">
+          ← Converter Outra Música
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      let downloadId = sessionStorage.getItem("downloadId");
+
+      console.log("🔍 Procurando downloadId...");
+      console.log("💾 sessionStorage.downloadId:", downloadId);
+      console.log("🔗 URL params.downloadId:", params.get("downloadId"));
+
+      // Se não tiver no sessionStorage, tentar URL
+      if (!downloadId) {
+        downloadId = params.get("downloadId");
+        console.log("📌 Usando downloadId da URL:", downloadId);
+      } else {
+        console.log("✅ Usando downloadId do sessionStorage:", downloadId);
+      }
+
+      // Carregar informações do arquivo
+      async function carregarInfo() {
+        console.log("🔍 Iniciando carregarInfo...");
+        console.log("📌 downloadId:", downloadId);
+
+        if (!downloadId) {
+          console.error("❌ downloadId está vazio!");
+          mostrarMensagem("❌ ID do download não encontrado", "error");
+          return;
+        }
+
+        try {
+          const url = `http://localhost:3000/status/${downloadId}`;
+          console.log("📡 Tentando buscar:", url);
+
+          const res = await fetch(url);
+          console.log("📊 Resposta status:", res.status, res.statusText);
+
+          if (!res.ok) {
+            const errorText = await res.text();
+            console.error("❌ Resposta não OK:", errorText);
+            throw new Error("Arquivo não encontrado ou expirou");
+          }
+
+          const data = await res.json();
+          console.log("📋 Dados recebidos:", data);
+
+          if (data.status !== "ready") {
+            console.warn("⚠️ Status não está pronto:", data.status);
+            mostrarMensagem(
+              `⏳ Arquivo ainda em processamento. Status: ${data.status}`,
+              "info",
+            );
+            // Tentar novamente em 5 segundos
+            setTimeout(carregarInfo, 5000);
+            return;
+          }
+
+          const sizeMB = (data.fileSize / 1024 / 1024).toFixed(2);
+          document.getElementById("file-size").textContent = `${sizeMB} MB`;
+          console.log("✅ Arquivo pronto para download:", data);
+        } catch (err) {
+          console.error("❌ Erro ao carregar info:", err);
+          mostrarMensagem(
+            "❌ Erro ao carregar informações do arquivo: " + err.message,
+            "error",
+          );
+        }
+      }
+
+      function executarDownload() {
+        if (!downloadId) {
+          alert("Erro: ID do download não encontrado");
+          return;
+        }
+
+        console.log("📥 Iniciando download:", downloadId);
+
+        // Criar link de download
+        const link = document.createElement("a");
+        link.href = `http://localhost:3000/download/${downloadId}`;
+        link.download = "musica.mp3";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        // Mostrar mensagem de sucesso
+        mostrarMensagem(
+          "<span class='spinner'></span>Arquivo sendo baixado... Você será redirecionado em breve",
+          "info",
+        );
+
+        // Voltar para página inicial após 3 segundos
+        setTimeout(() => {
+          voltarParaInicio();
+        }, 3000);
+      }
+
+      function voltarParaInicio() {
+        sessionStorage.removeItem("downloadId");
+        window.location.href = "index.html";
+      }
+
+      function mostrarMensagem(text, type) {
+        const messageEl = document.getElementById("message");
+        messageEl.innerHTML = text;
+        messageEl.className = "message " + type;
+        messageEl.style.display = "block";
+      }
+
+      // Carregar informações ao abrir a página
+      carregarInfo();
+    </script>
+  </body>
+</html>

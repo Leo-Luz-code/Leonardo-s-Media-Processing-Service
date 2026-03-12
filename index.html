@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Baixa Músicas do YouTube</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>🎵 Baixa Músicas do YouTube</h1>
+      <p class="subtitle">Converta vídeos do YouTube em MP3</p>
+
+      <div class="form-group">
+        <input
+          id="youtubeUrl"
+          placeholder="Cole o link do YouTube"
+          type="text"
+        />
+        <button id="converterBtn" type="button">Baixar</button>
+      </div>
+
+      <div id="statusMsg" class="message"></div>
+    </div>
+
+    <script>
+      let processando = false;
+
+      async function converter() {
+        if (processando) return;
+
+        const url = document.getElementById("youtubeUrl").value.trim();
+        const btn = document.getElementById("converterBtn");
+        const msg = document.getElementById("statusMsg");
+
+        if (!url) {
+          msg.className = "message error";
+          msg.textContent = "Cole a URL do YouTube";
+          return;
+        }
+
+        if (!url.includes("youtube.com") && !url.includes("youtu.be")) {
+          msg.className = "message error";
+          msg.textContent = "URL inválida";
+          return;
+        }
+
+        processando = true;
+        btn.disabled = true;
+        msg.className = "message info";
+        msg.innerHTML = '<span class="spinner"></span>Iniciando...';
+
+        try {
+          // 1. Converter
+          console.log("📤 Enviando para POST /convert...", { url });
+          const res = await fetch("http://localhost:3000/convert", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url }),
+          });
+
+          console.log("📊 Resposta recebida:", {
+            status: res.status,
+            statusText: res.statusText,
+            ok: res.ok,
+          });
+
+          if (!res.ok) {
+            const errorData = await res.json();
+            console.error("❌ Erro na resposta:", errorData);
+            throw new Error(
+              "Erro ao iniciar: " + (errorData.error || res.statusText),
+            );
+          }
+
+          const data = await res.json();
+          console.log("✅ downloadId recebido:", data.downloadId);
+          console.log("📋 Dados completos:", data);
+
+          const downloadId = data.downloadId;
+
+          if (!downloadId) {
+            console.error("❌ downloadId está undefined nos dados:", data);
+            throw new Error("Servidor não retornou downloadId");
+          }
+
+          // 2. Aguardar conversão
+          let pronto = false;
+          let tentativas = 0;
+
+          while (!pronto && tentativas < 180) {
+            const statusRes = await fetch(
+              `http://localhost:3000/status/${downloadId}`,
+            );
+            const status = await statusRes.json();
+
+            console.log(`[Tentativa ${tentativas + 1}] Status:`, status.status);
+
+            if (status.status === "ready") {
+              pronto = true;
+              break;
+            }
+
+            if (status.status === "error") {
+              throw new Error("Erro na conversão");
+            }
+
+            msg.innerHTML = `<span class="spinner"></span>Convertendo... (${tentativas + 1}/180)`;
+            await new Promise((r) => setTimeout(r, 10000));
+            tentativas++;
+          }
+
+          if (!pronto) throw new Error("Timeout");
+
+          // 3. Salvar no sessionStorage e redirecionar
+          console.log("💾 Salvando downloadId no sessionStorage:", downloadId);
+          sessionStorage.setItem("downloadId", downloadId);
+
+          const downloadUrl = "download.html";
+          console.log("🔗 Redirecionando para:", downloadUrl);
+          window.location.href = downloadUrl;
+        } catch (erro) {
+          msg.className = "message error";
+          msg.textContent = "❌ Erro: " + erro.message;
+          processando = false;
+          btn.disabled = false;
+        }
+      }
+
+      document
+        .getElementById("converterBtn")
+        .addEventListener("click", converter);
+    </script>
+  </body>
+</html>
