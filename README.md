@@ -42,7 +42,13 @@ Você deve ver a mensagem: "Servidor rodando na porta 3000"
 
 ### 2. Abra o navegador
 
-Abra o arquivo `index.html` no navegador ou acesse `http://localhost:3000` (você pode servir o arquivo estático adicionando uma rota no server.js se preferir)
+Sirva a página HTML dentro da raiz do projeto.
+
+```bash
+npx serve .
+```
+
+Acesse o link gerado.
 
 ### 3. Baixe suas músicas
 
